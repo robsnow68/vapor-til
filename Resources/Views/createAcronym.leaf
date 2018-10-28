@@ -21,6 +21,7 @@ id="long" #if(editing){value="#(acronym.long)"}/>
 }
 </select>
 </div>
+#// 1
 <div class="form-group">
     #// 2
     <label for="categories">Categories</label>
