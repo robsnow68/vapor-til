@@ -1,6 +1,7 @@
 
 import Vapor
 import Fluent
+import Authentication
 
 struct AcronymsController: RouteCollection {
     func boot(router: Router) throws {
@@ -10,13 +11,13 @@ struct AcronymsController: RouteCollection {
        // router.get("api", "acronyms", use: getAllHandler)
         acronymsRoutes.get(use: getAllHandler)
         // 1
-        acronymsRoutes.post(Acronym.self, use: createHandler)
+        //acronymsRoutes.post(Acronym.self, use: createHandler)
         // 2
         acronymsRoutes.get(Acronym.parameter, use: getHandler)
         // 3
-        acronymsRoutes.put(Acronym.parameter, use: updateHandler)
+      
         // 4
-        acronymsRoutes.delete(Acronym.parameter, use: deleteHandler)
+        
         // 5
         acronymsRoutes.get("search", use: searchHandler)
         // 6
@@ -28,32 +29,63 @@ struct AcronymsController: RouteCollection {
             Acronym.parameter, "user",
             use: getUserHandler)
         
-        acronymsRoutes.post(
-            Acronym.parameter,
-            "categories",
-            Category.parameter,
-            use: addCategoriesHandler)
+    
         
         acronymsRoutes.get(
             Acronym.parameter,
             "categories",
             use: getCategoriesHandler)
         
-        acronymsRoutes.delete(
+    
+        
+        // 1
+        let tokenAuthMiddleware = User.tokenAuthMiddleware()
+        let guardAuthMiddleware = User.guardAuthMiddleware()
+        // 2
+        let tokenAuthGroup = acronymsRoutes.grouped(
+            tokenAuthMiddleware,
+            guardAuthMiddleware)
+        // 3
+        tokenAuthGroup.post(AcronymCreateData.self, use: createHandler)
+        
+        tokenAuthGroup.delete(Acronym.parameter, use: deleteHandler)
+        tokenAuthGroup.put(Acronym.parameter, use: updateHandler)
+        tokenAuthGroup.post(
+            Acronym.parameter,
+            "categories",
+            Category.parameter,
+            use: addCategoriesHandler)
+        tokenAuthGroup.delete(
             Acronym.parameter,
             "categories",
             Category.parameter,
             use: removeCategoriesHandler)
+        // 4
+        //protected.post(Acronym.self, use: createHandler)
     }
     
     func getAllHandler(_ req: Request) throws -> Future<[Acronym]> {
         return Acronym.query(on: req).all()
     }
     
+    //func createHandler(
+    //    _ req: Request,
+    //    acronym: Acronym
+    //    ) throws -> Future<Acronym> {
+    //    return acronym.save(on: req)
+    //}
+    
+    // 1
     func createHandler(
         _ req: Request,
-        acronym: Acronym
-        ) throws -> Future<Acronym> {
+        data: AcronymCreateData) throws -> Future<Acronym> {
+        // 2
+        let user = try req.requireAuthenticated(User.self)
+        // 3
+        let acronym = try Acronym(
+            short: data.short, long: data.long,
+            userID: user.requireID())
+        // 4
         return acronym.save(on: req)
     }
     
@@ -62,14 +94,17 @@ struct AcronymsController: RouteCollection {
     }
     
     func updateHandler(_ req: Request) throws -> Future<Acronym> {
+        // 1
         return try flatMap(
             to: Acronym.self,
             req.parameters.next(Acronym.self),
-            req.content.decode(Acronym.self)
-        ) { acronym, updatedAcronym in
-            acronym.short = updatedAcronym.short
-            acronym.long = updatedAcronym.long
-            acronym.userID = updatedAcronym.userID
+            req.content.decode(AcronymCreateData.self)
+        ) { acronym, updateData in
+            acronym.short = updateData.short
+            acronym.long = updateData.long
+            // 2
+            let user = try req.requireAuthenticated(User.self)
+            acronym.userID = try user.requireID()
             return acronym.save(on: req)
         } }
     
@@ -108,13 +143,13 @@ struct AcronymsController: RouteCollection {
     }
     
     // 1
-    func getUserHandler(_ req: Request) throws -> Future<User> {
+    func getUserHandler(_ req: Request) throws -> Future<User.Public> {
         // 2
         return try req
             .parameters.next(Acronym.self)
-            .flatMap(to: User.self) { acronym in
+            .flatMap(to: User.Public.self) { acronym in
                 // 3
-                acronym.user.get(on: req)
+                acronym.user.get(on: req).convertToPublic()
         }
     }
     
@@ -161,4 +196,9 @@ struct AcronymsController: RouteCollection {
                 .transform(to: .noContent)
         }
     }
+}
+
+struct AcronymCreateData: Content {
+    let short: String
+    let long: String
 }

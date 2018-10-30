@@ -2,6 +2,7 @@
 import FluentPostgreSQL
 import Vapor
 import Leaf
+import Authentication
 
 public func configure(
     _ config: inout Config,
@@ -14,6 +15,7 @@ public func configure(
     services.register(commandConfig)
     
     try services.register(LeafProvider())
+    try services.register(AuthenticationProvider())
     
     try services.register(FluentPostgreSQLProvider())
     let router = EngineRouter.default()
@@ -60,6 +62,8 @@ public func configure(
         model: AcronymCategoryPivot.self,
         database: .psql)
     
+    migrations.add(model: Token.self, database: .psql)
+    migrations.add(migration: AdminUser.self, database: .psql)
     services.register(migrations)
     
     config.prefer(LeafRenderer.self, for: ViewRenderer.self)
