@@ -106,3 +106,8 @@ struct AdminUser: Migration {
     }
 }
 
+// 1
+extension User: PasswordAuthenticatable {}
+// 2
+extension User: SessionAuthenticatable {}
+

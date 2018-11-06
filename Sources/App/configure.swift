@@ -24,6 +24,7 @@ public func configure(
     var middlewares = MiddlewareConfig()
     middlewares.use(ErrorMiddleware.self)
     middlewares.use(FileMiddleware.self)
+    middlewares.use(SessionsMiddleware.self)
     services.register(middlewares)
     // Configure a database
     // 1
@@ -38,15 +39,18 @@ public func configure(
     
     let password = Environment.get("DATABASE_PASSWORD")
         ?? "password"
+    let databasePort = 5433
     // 3
    let databaseConfig = PostgreSQLDatabaseConfig(
         hostname: hostname,
+        port: databasePort,
         username: username,
         database: databaseName,
         password: password)
 
     // 4
     let database = PostgreSQLDatabase(config: databaseConfig)
+    
     // 5
     databases.add(database: database, as: .psql)
     // 6
@@ -67,5 +71,6 @@ public func configure(
     services.register(migrations)
     
     config.prefer(LeafRenderer.self, for: ViewRenderer.self)
+    config.prefer(MemoryKeyedCache.self, for: KeyedCache.self)
 }
 
