@@ -190,17 +190,24 @@ struct WebsiteController: RouteCollection {
   }
 
   func editAcronymHandler(_ req: Request) throws -> Future<View> {
+    let token = try CryptoRandom()
+        .generateData(count: 16)
+        .base64EncodedString()
+  
+    try req.session()["CSRF_TOKEN"] = token
     return try req.parameters.next(Acronym.self)
       .flatMap(to: View.self) { acronym in
         let categories = try acronym.categories.query(on: req).all()
         let context = EditAcronymContext(
             acronym: acronym,
-            categories: categories)
+            categories: categories,
+            csrfToken: token)
         return try req.view().render("createAcronym", context)
     }
   }
 
   func editAcronymPostHandler(_ req: Request) throws -> Future<Response> {
+    
     return try flatMap(
       to: Response.self,
       req.parameters.next(Acronym.self),
@@ -209,6 +216,14 @@ struct WebsiteController: RouteCollection {
         acronym.short = data.short
         acronym.long = data.long
         acronym.userID = try user.requireID()
+        // 1
+        let expectedToken = try req.session()["CSRF_TOKEN"]
+        // 2
+        try req.session()["CSRF_TOKEN"] = nil
+        // 3
+        guard expectedToken == data.csrfToken else {
+            throw Abort(.badRequest)
+        }
         
         return acronym.save(on: req).flatMap(to: Response.self) { savedAcronym in
           guard let id = savedAcronym.id else {
@@ -330,10 +345,16 @@ struct WebsiteController: RouteCollection {
         // 2
         let password = try BCrypt.hash(data.password)
         // 3
+        var twitterURL: String?
+        if let twitter = data.twitterURL,
+            !twitter.isEmpty {
+            twitterURL = twitter
+        }
         let user = User(
             name: data.name,
             username: data.username,
-            password: password)
+            password: password,
+            twitterURL: twitterURL)
         // 4
         return user.save(on: req).map(to: Response.self) { user in
             // 5
@@ -379,16 +400,19 @@ struct CategoryContext: Encodable {
   let acronyms: Future<[Acronym]>
 }
 
-struct CreateAcronymContext: Encodable {
-  let title = "Create An Acronym"
-  let csrfToken: String
-}
+
 
 struct EditAcronymContext: Encodable {
   let title = "Edit Acronym"
   let acronym: Acronym
   let editing = true
   let categories: Future<[Category]>
+  let csrfToken: String
+}
+
+struct CreateAcronymContext: Encodable {
+    let title = "Create An Acronym"
+    let csrfToken: String
 }
 
 struct CreateAcronymData: Content {
@@ -424,6 +448,7 @@ struct RegisterData: Content {
     let username: String
     let password: String
     let confirmPassword: String
+     let twitterURL: String?
 }
 
 // 1

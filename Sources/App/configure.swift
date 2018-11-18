@@ -95,6 +95,11 @@ public func configure(
     
     migrations.add(model: Token.self, database: .psql)
     migrations.add(migration: AdminUser.self, database: .psql)
+    
+    migrations.add(
+        migration: AddTwitterURLToUser.self,
+        database: .psql)
+    
     services.register(migrations)
     
     config.prefer(LeafRenderer.self, for: ViewRenderer.self)

@@ -8,21 +8,33 @@ final class User: Codable {
     var name: String
     var username: String
     var password: String
+    var twitterURL: String?
     
-    init(name: String, username: String, password: String) {
+    init(name: String,
+         username: String,
+         password: String,
+         twitterURL: String? = nil) {
         self.name = name
         self.username = username
         self.password = password
+        self.twitterURL = twitterURL
     }
+    
     final class Public: Codable {
         var id: UUID?
         var name: String
         var username: String
-        init(id: UUID?, name: String, username: String) {
+        var twitterURL: String?
+        init(id: UUID?,
+             name: String,
+             username: String,
+             twitterURL: String? = nil) {
             self.id = id
             self.name = name
             self.username = username
-        } }
+            self.twitterURL = twitterURL
+        }
+    }
 }
 
 extension User: PostgreSQLUUIDModel {}
@@ -33,7 +45,10 @@ extension User: Migration {
             // 1
             return Database.create(self, on: connection) { builder in
                 // 2
-                try addProperties(to: builder)
+                builder.field(for: \.id, isIdentifier: true)
+                builder.field(for: \.name)
+                builder.field(for: \.username)
+                builder.field(for: \.password)
                 // 3
                 builder.unique(on: \.username)
             } }
@@ -47,13 +62,15 @@ extension User {
         return children(\.userID)
     }
 }
+
 extension User {
-    // 1
     func convertToPublic() -> User.Public {
-        // 2
-        return User.Public(id: id, name: name, username: username)
-    }
-}
+        return User.Public(
+            id: id,
+            name: name,
+            username: username,
+            twitterURL: twitterURL)
+    } }
 // 1
 extension Future where T: User {
     // 2
@@ -110,4 +127,6 @@ struct AdminUser: Migration {
 extension User: PasswordAuthenticatable {}
 // 2
 extension User: SessionAuthenticatable {}
+
+
 
